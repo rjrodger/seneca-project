@@ -31,7 +31,7 @@ module.exports = function( options ) {
   var userent    = seneca.make$('sys/user')
 
 
-  seneca.add({role:plugin,cmd:'create'},        create_project)
+  seneca.add({role:plugin,cmd:'save'},          save_project)
   seneca.add({role:plugin,cmd:'start'},         start_project)
   seneca.add({role:plugin,cmd:'stop'},          stop_project)
   seneca.add({role:plugin,cmd:'move'},          move_project)
@@ -88,21 +88,33 @@ module.exports = function( options ) {
 
 
   
-  function create_project( args, done ) {
-    projectent.make$(_.extend({},args,{
-      name: args.name,
-      active: void 0 == args.active ? true : !!args.active,
-      account:args.account.id
-
-    })).save$( function( err, project ) {
-      additem( args.account, project, 'projects')
-
-      args.account.save$( function( err, account ) {
+  function save_project( args, done ) {
+    if( args.id ) {
+      projectent.load$(args.id, function( err, project ){
         if( err ) return done( err );
-
-        done(null,project)
+        return update_project( project )
       })
-    })
+    }
+    else return update_project( projectent.make$() );
+
+    function update_project( project ) {
+      var fields = seneca.util.argprops({}, args, {
+        active: void 0 == args.active ? true : !!args.active,
+        account:args.account.id
+      }, 'id, role, cmd, user')
+
+      project.data$(fields)
+
+      project.save$( function( err, project ) {
+        additem( args.account, project, 'projects')
+
+        args.account.save$( function( err, account ) {
+          if( err ) return done( err );
+
+          done(null,{project:project})
+        })
+      })
+    }
   }
 
 
@@ -211,8 +223,6 @@ module.exports = function( options ) {
     accountent.load$( project.account, function( err, account ) {
       if( err ) return err;
 
-      console.log(account)
-
       list = list.concat( account.users || [] )
       list = _.uniq(list)
 
@@ -224,9 +234,18 @@ module.exports = function( options ) {
   
   function buildcontext( req, res, args, act, respond ) {
     var user = req.seneca && req.seneca.user
+
     if( user ) {
       args.user = user
+
+      if( args.account && !_.contains(args.user.accounts,args.account) ) {
+        return seneca.fail({code:'invalid-account'},respond)
+      }
+      else {
+        args.account = args.user.accounts[0]
+      }
     }
+    else return seneca.fail({code:'user-required'},respond);
 
     act(args,respond)
   }
@@ -239,7 +258,8 @@ module.exports = function( options ) {
     pin:{role:plugin,cmd:'*'},
     map:{
       'user_projects': { GET:buildcontext },
-      'load': { GET:buildcontext, alias:'load/:project' }
+      'load': { GET:buildcontext, alias:'load/:project' },
+      'save': { POST:buildcontext }
     }
   }})
 

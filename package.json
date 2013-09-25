@@ -1,10 +1,10 @@
 {
   "name": "seneca-project",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Seneca project business logic",
   "main": "project.js",
   "scripts": {
-    "test": "node project.js"
+    "test": "node_modules/.bin/mocha test/*.test.js"
   },
   "repository": {
     "type": "git",
@@ -18,15 +18,17 @@
   "author": "Richard Rodger (http://richardrodger.com)",
   "license": "MIT",
   "dependencies": {
-    "underscore": "~1.4.4",
+    "underscore": "~1.5.2",
     "async": "~0.2.9"
   },
   "devDependencies": {
+    "seneca-account": "~0.1.4",
     "gex": "~0.1.1",
-    "chai": "~1.7.2",
-    "async": "~0.2.5",
-    "seneca": "~0.5.9",
-    "seneca-account": "~0.1.0"
+    "chai": "~1.8.0",
+    "seneca": "~0.5.12",
+    "mocha": "~1.13.0",
+    "seneca-auth": "~0.2.7",
+    "seneca-user": "~0.2.6"
   },
   "files": [
     "README.md",

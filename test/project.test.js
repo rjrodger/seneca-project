@@ -32,6 +32,7 @@ function cberr(win){
 
 var si = seneca()
 si.use( 'user' )
+si.use( 'auth' )
 si.use( 'account' )
 si.use( '..' )
 
@@ -78,8 +79,7 @@ describe('user', function() {
       
 
       add_users_to_account: function(cb){
-        accountpin.adduser( { user:tmp.u1, account:tmp.a1 }, function( err, out ){
-          console.dir(out)
+        accountpin.add_user( { user:tmp.u1, account:tmp.a1 }, function( err, out ){
           assert.isNotNull(out.user)
           assert.isNotNull(out.account)
           assert.ok(_.contains(out.user.accounts,out.account.id))
@@ -92,14 +92,13 @@ describe('user', function() {
 
 
       create_project: function(cb){
-        projectpin.create({name:'p1',account:tmp.a1},cberr(function(p1){
-          tmp.p1 = p1
+        projectpin.save({name:'p1',account:tmp.a1},cberr(function(out){
+          tmp.p1 = out.project
+          assert.equal( 'p1', tmp.p1.name )
 
           tmp.a1.load$(cberr(function(a1){
-            tmp.a1 = a1
+            assert.ok( _.contains(a1.projects,tmp.p1.id) ) 
 
-            console.dir(tmp.a1)
-            console.dir(tmp.p1)
             cb()
           }))
         }))
@@ -107,10 +106,9 @@ describe('user', function() {
       
       
       user_projects: function(cb){
-        projectpin['project-users']({project:tmp.p1},cberr(function(list){
-          console.dir(list)
-          assert.ok(1==list.length)
-          assert.equal(tmp.u1.id,list[0].id)
+        projectpin['project_users']({project:tmp.p1},cberr(function(out){
+          assert.ok(1==out.users.length)
+          assert.equal(tmp.u1.id,out.users[0].id)
         }))
       },
 
