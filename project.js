@@ -9,37 +9,44 @@ var async = require('async')
 
 module.exports = function( options ) {
   var seneca = this
-  var name   = 'project'
+  var plugin   = 'project'
 
-  seneca.depends(name,['user','account'])
+  seneca.depends(plugin,['user','account'])
 
 
   options = seneca.util.deepextend({
-    loadlimit:3
+    loadlimit:3,
+    prefix: '/project',
+    web:true
   },options)
   
 
+  if( options.web ) {
+    seneca.depends(plugin,['auth'])
+  }
 
-  var projectent = seneca.make$('sys','project')
-  var accountent = seneca.make$('sys','account')
-  var userent    = seneca.make$('sys','user')
+
+  var projectent = seneca.make$('sys/project')
+  var accountent = seneca.make$('sys/account')
+  var userent    = seneca.make$('sys/user')
 
 
-  seneca.add({role:name,cmd:'create'},        create_project)
-  seneca.add({role:name,cmd:'start'},         start_project)
-  seneca.add({role:name,cmd:'stop'},          stop_project)
-  seneca.add({role:name,cmd:'move'},          move_project)
-  seneca.add({role:name,cmd:'adduser'},       adduser)
-  seneca.add({role:name,cmd:'removeuser'},    removeuser)
-  seneca.add({role:name,cmd:'project-users'}, project_users)
-  seneca.add({role:name,cmd:'user-projects'}, user_projects)
+  seneca.add({role:plugin,cmd:'create'},        create_project)
+  seneca.add({role:plugin,cmd:'start'},         start_project)
+  seneca.add({role:plugin,cmd:'stop'},          stop_project)
+  seneca.add({role:plugin,cmd:'move'},          move_project)
+  seneca.add({role:plugin,cmd:'adduser'},       adduser)
+  seneca.add({role:plugin,cmd:'removeuser'},    removeuser)
+  seneca.add({role:plugin,cmd:'project_users'}, project_users)
+  seneca.add({role:plugin,cmd:'user_projects'}, user_projects)
+  seneca.add({role:plugin,cmd:'load'},          load_project)
 
 
 
   seneca.act({
     role:'util',
     cmd:'ensure_entity',
-    pin:{role:name,cmd:'*'},
+    pin:{role:plugin,cmd:'*'},
     entmap:{
       account:accountent,
       project:projectent,
@@ -50,7 +57,7 @@ module.exports = function( options ) {
 
 
   
-  var pin = seneca.pin({role:name,cmd:'*'})
+  var pin = seneca.pin({role:plugin,cmd:'*'})
 
 
 
@@ -65,11 +72,18 @@ module.exports = function( options ) {
 
 
 
-  function loadall( ent, list, done ) {
+  function loadall( name, ent, list, done ) {
     async.mapLimit(list||[],options.loadlimit,function(id,cb){
       if( id && id.entity$ ) return cb(null,id);
       ent.load$(id,cb)
-    }, done )
+
+    }, function( err, list ) {
+      if( err ) return done(err);
+
+      var out = {}
+      out[name] = list
+      return done( null, out )
+    })
   }
 
 
@@ -91,6 +105,10 @@ module.exports = function( options ) {
     })
   }
 
+
+  function load_project( args, done ) {
+    done( null, {project:args.project} )
+  }
 
 
   function start_project( args, done ) {
@@ -178,7 +196,7 @@ module.exports = function( options ) {
 
       list = _.uniq(list)
 
-      loadall( projectent, list, done )
+      loadall( 'projects', projectent, list, done )
     })
   }
 
@@ -190,9 +208,6 @@ module.exports = function( options ) {
     // specifically assigned to project
     var list = project.users ? _.clone(project.users) : []
     
-    console.log(project)
-    console.log(list)
-
     accountent.load$( project.account, function( err, account ) {
       if( err ) return err;
 
@@ -201,19 +216,43 @@ module.exports = function( options ) {
       list = list.concat( account.users || [] )
       list = _.uniq(list)
 
-      loadall( userent, list, done )
+      loadall( 'users', userent, list, done )
     })
   }
 
 
+  
+  function buildcontext( req, res, args, act, respond ) {
+    var user = req.seneca && req.seneca.user
+    if( user ) {
+      args.user = user
+    }
+
+    act(args,respond)
+  }
 
 
-  seneca.add({init:name}, function( args, done ){
+
+  // web interface
+  seneca.act_if(options.web, {role:'web', use:{
+    prefix:options.prefix,
+    pin:{role:plugin,cmd:'*'},
+    map:{
+      'user_projects': { GET:buildcontext },
+      'load': { GET:buildcontext, alias:'load/:project' }
+    }
+  }})
+
+
+
+
+  seneca.add({init:plugin}, function( args, done ){
     seneca.act('role:util, cmd:define_sys_entity', {list:[projectent.canon$()]})
+    done()
   })
 
 
   return {
-    name: name
+    name: plugin
   }
 }
