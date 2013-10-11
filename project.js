@@ -5,6 +5,7 @@
 var _     = require('underscore')
 var async = require('async')
 
+var nid = require('nid')
 
 
 module.exports = function( options ) {
@@ -17,12 +18,19 @@ module.exports = function( options ) {
   options = seneca.util.deepextend({
     loadlimit:3,
     prefix: '/project',
-    web:true
+    web:true,
+    idgen:{human:false,length:6}
   },options)
   
 
   if( options.web ) {
     seneca.depends(plugin,['auth'])
+  }
+
+
+  var projnid
+  if( options.idgen.short ) {
+    projnid = nid({length:options.idgen.length})
   }
 
 
@@ -89,13 +97,30 @@ module.exports = function( options ) {
 
   
   function save_project( args, done ) {
+    var isnew = false
+
     if( args.id ) {
       projectent.load$(args.id, function( err, project ){
         if( err ) return done( err );
         return update_project( project )
       })
     }
-    else return update_project( projectent.make$() );
+    else {
+      isnew = true
+      var newproj = projectent.make$()
+      
+      if( projnid ) return genid();
+      return update_project( newproj );
+    }
+
+    function genid() {
+      newproj.id$ = projnid()
+      projectent.load$(newproj.id$, function(err,found){
+        if( err) return done(err);
+        if( found ) return genid();
+        return update_project( newproj );
+      })
+    }
 
     function update_project( project ) {
       var fields = seneca.util.argprops({}, args, {
@@ -111,7 +136,7 @@ module.exports = function( options ) {
         args.account.save$( function( err, account ) {
           if( err ) return done( err );
 
-          done(null,{project:project})
+          done(null,{project:project,account:account,new:isnew})
         })
       })
     }

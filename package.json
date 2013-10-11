@@ -19,7 +19,8 @@
   "license": "MIT",
   "dependencies": {
     "underscore": "~1.5.2",
-    "async": "~0.2.9"
+    "async": "~0.2.9",
+    "nid": "~0.3.0"
   },
   "devDependencies": {
     "seneca-account": "~0.1.4",
