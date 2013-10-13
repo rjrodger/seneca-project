@@ -149,15 +149,19 @@ module.exports = function( options ) {
 
 
   function start_project( args, done ) {
-    args.project.active = false
-    args.project.save$( done )
+    args.project.active = true
+    args.project.save$( function(err,project){
+      return done(err,{ok:!err,project:project})
+    })
   }
 
 
 
   function stop_project( args, done ) {
-    args.project.active = true
-    args.project.save$( done )
+    args.project.active = false
+    args.project.save$( function(err,project){
+      return done(err,{ok:!err,project:project})
+    })
   }
 
 
@@ -283,8 +287,10 @@ module.exports = function( options ) {
     pin:{role:plugin,cmd:'*'},
     map:{
       'user_projects': { GET:buildcontext },
-      'load': { GET:buildcontext, alias:'load/:project' },
-      'save': { POST:buildcontext }
+      'load':  { GET:buildcontext, alias:'load/:project' },
+      'save':  { POST:buildcontext },
+      'start': { POST:buildcontext },
+      'stop':  { POST:buildcontext }
     }
   }})
 
