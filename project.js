@@ -123,10 +123,22 @@ module.exports = function( options ) {
     }
 
     function update_project( project ) {
-      var fields = seneca.util.argprops({}, args, {
-        active: void 0 == args.active ? true : !!args.active,
-        account:args.account.id
-      }, 'id, role, cmd, user')
+      var fields = seneca.util.argprops(
+
+        // default values
+        { kind:'primary' }, 
+
+        // caller specified values, overrides defaults
+        args, 
+
+        // controlled values, can't be overridden
+        {
+          active: void 0 == args.active ? true : !!args.active,
+          account:args.account.id,
+        }, 
+
+        // invalid properties, will be deleted
+        'id, role, cmd, user')
 
       project.data$(fields)
 
@@ -216,6 +228,12 @@ module.exports = function( options ) {
 
     // all projects in account, if project has no specific users
     async.mapLimit(user.accounts||[],options.loadlimit,function(accid,cb){
+
+      var q = {account:accid}
+      if( void 0 != args.kind ) {
+        q.kind = args.kind
+      }
+
       projectent.list$({account:accid},function(err,projects){
         if( err ) return cb(err);
 
@@ -236,8 +254,17 @@ module.exports = function( options ) {
       if( err ) return done(err);
 
       list = _.uniq(list)
+      loadall( 'projects', projectent, list, function(err,out){
+        if( err) return done(err);
 
-      loadall( 'projects', projectent, list, done )
+        if( void 0 != args.kind ) {
+          out.projects = _.filter(out.projects,function(proj){
+            return args.kind == proj.kind
+          })
+        }
+
+        done(err,out)
+      })
     })
   }
 
