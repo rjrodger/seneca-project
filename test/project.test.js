@@ -47,7 +47,7 @@ var projectent = si.make$('sys','project')
 var userent    = si.make$('sys','user')
 
 
-describe('user', function() {
+describe('project', function() {
 
   var tmp = {}
   
