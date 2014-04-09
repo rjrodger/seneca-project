@@ -39,9 +39,7 @@ module.exports = function( options ) {
   var userent    = seneca.make$('sys/user')
 
 
-  seneca.add({role:plugin,cmd:'save'},          
-             {required$:'account'},
-             save_project)
+  seneca.add({role:plugin,cmd:'save'},          save_project)
   seneca.add({role:plugin,cmd:'start'},         start_project)
   seneca.add({role:plugin,cmd:'stop'},          stop_project)
   seneca.add({role:plugin,cmd:'move'},          move_project)
