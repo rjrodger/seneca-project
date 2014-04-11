@@ -21,7 +21,7 @@ module.exports = function( options ) {
     web:true,
     idgen:{human:false,length:6}
   },options)
-  
+
 
   if( options.web ) {
     seneca.depends(plugin,['auth'])
@@ -64,7 +64,7 @@ module.exports = function( options ) {
 
 
 
-  
+
   var pin = seneca.pin({role:plugin,cmd:'*'})
 
 
@@ -95,8 +95,10 @@ module.exports = function( options ) {
   }
 
 
-  
+
   function save_project( args, done ) {
+    var projectent = this.make$('sys/project')
+
     var isnew = false
 
     if( args.id ) {
@@ -108,7 +110,7 @@ module.exports = function( options ) {
     else {
       isnew = true
       var newproj = projectent.make$({id$:args.id$})
-      
+
 
       if( projnid ) return genid();
       return update_project( newproj );
@@ -127,16 +129,16 @@ module.exports = function( options ) {
       var fields = seneca.util.argprops(
 
         // default values
-        { kind:'primary' }, 
+        { kind:'primary' },
 
         // caller specified values, overrides defaults
-        args, 
+        args,
 
         // controlled values, can't be overridden
         {
           active: void 0 == args.active ? true : !!args.active,
           account:args.account.id,
-        }, 
+        },
 
         // invalid properties, will be deleted
         'id, role, cmd, user')
@@ -222,6 +224,9 @@ module.exports = function( options ) {
 
 
   function user_projects( args, done ) {
+
+    var projectent = this.make$('sys/project')
+
     var user = args.user
 
     // specifically assigned to projects
@@ -276,7 +281,7 @@ module.exports = function( options ) {
 
     // specifically assigned to project
     var list = project.users ? _.clone(project.users) : []
-    
+
     accountent.load$( project.account, function( err, account ) {
       if( err ) return err;
 
@@ -288,7 +293,7 @@ module.exports = function( options ) {
   }
 
 
-  
+
   function buildcontext( req, res, args, act, respond ) {
     var user = req.seneca && req.seneca.user
 
