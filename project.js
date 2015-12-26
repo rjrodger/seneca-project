@@ -1,27 +1,35 @@
-/* Copyright (c) 2013 Richard Rodger, MIT License */
+/* Copyright (c) 2013-2015 Richard Rodger and other contributors, MIT License */
 "use strict";
 
 
-var _     = require('underscore')
+var _     = require('lodash')
 var async = require('async')
 
 var nid = require('nid')
 
 
-module.exports = function( options ) {
+module.exports = function project( options ) {
   var seneca = this
-  var plugin   = 'project'
-
-  seneca.depends(plugin,['user','account'])
-
 
   options = seneca.util.deepextend({
-    loadlimit:3,
-    prefix: '/project',
-    web:true,
+    name: 'project',
+    base: 'sys',
+    listname: 'projects',
+    loadlimit: 3,
+    web: true,
     idgen:{human:false,length:6}
   },options)
 
+  options.prefix = options.prefix || '/'+options.name
+
+  var plugin  = options.name
+
+  var project_entname = options.base+'/'+options.name
+  var account_entname = 'sys/account'
+  var user_entname    = 'sys/user'
+
+
+  seneca.depends(plugin,['user','account'])
 
   if( options.web ) {
     seneca.depends(plugin,['auth'])
@@ -34,39 +42,32 @@ module.exports = function( options ) {
   }
 
 
-  var projectent = seneca.make$('sys/project')
-  var accountent = seneca.make$('sys/account')
-  var userent    = seneca.make$('sys/user')
+  seneca.add({role:plugin,cmd:'save'},       save_project)
+  seneca.add({role:plugin,cmd:'start'},      start_project)
+  seneca.add({role:plugin,cmd:'stop'},       stop_project)
+  seneca.add({role:plugin,cmd:'move'},       move_project)
+  seneca.add({role:plugin,cmd:'adduser'},    adduser)
+  seneca.add({role:plugin,cmd:'removeuser'}, removeuser)
+  seneca.add({role:plugin,cmd:'load'},       load_project)
+  seneca.add({role:plugin,cmd:'list_users'}, list_users)
+  seneca.add({role:plugin,cmd:'for_user'},   for_user)
+
+  // legacy patterns
+  seneca.add({role:plugin,cmd:'project_users'}, list_users)
+  seneca.add({role:plugin,cmd:'user_projects'}, for_user)
 
 
-  seneca.add({role:plugin,cmd:'save'},          save_project)
-  seneca.add({role:plugin,cmd:'start'},         start_project)
-  seneca.add({role:plugin,cmd:'stop'},          stop_project)
-  seneca.add({role:plugin,cmd:'move'},          move_project)
-  seneca.add({role:plugin,cmd:'adduser'},       adduser)
-  seneca.add({role:plugin,cmd:'removeuser'},    removeuser)
-  seneca.add({role:plugin,cmd:'project_users'}, project_users)
-  seneca.add({role:plugin,cmd:'user_projects'}, user_projects)
-  seneca.add({role:plugin,cmd:'load'},          load_project)
-
-
-
+  // FIX: deprecated, use a wrap instead
   seneca.act({
     role:'util',
     cmd:'ensure_entity',
     pin:{role:plugin,cmd:'*'},
     entmap:{
-      account:accountent,
-      project:projectent,
-      user:userent,
+      account: seneca.make( account_entname ),
+      project: seneca.make( project_entname ),
+      user: seneca.make( user_entname ),
     }
   })
-
-
-
-
-  var pin = seneca.pin({role:plugin,cmd:'*'})
-
 
 
 
@@ -97,7 +98,7 @@ module.exports = function( options ) {
 
 
   function save_project( args, done ) {
-    var projectent = this.make$('sys/project')
+    var projectent = this.make$( project_entname )
 
     var isnew = false
 
@@ -126,6 +127,8 @@ module.exports = function( options ) {
     }
 
     function update_project( project ) {
+
+      // TODO: argprops to be deprecated
       var fields = seneca.util.argprops(
 
         // default values
@@ -146,12 +149,14 @@ module.exports = function( options ) {
       project.data$(fields)
 
       project.save$( function( err, project ) {
-        additem( args.account, project, 'projects')
+        additem( args.account, project, options.listname)
 
         args.account.save$( function( err, account ) {
           if( err ) return done( err );
 
-          done(null,{project:project,account:account,new:isnew})
+          var out = {account:account,new:isnew}
+          out[options.name] = project
+          done(null,out)
         })
       })
     }
@@ -159,43 +164,50 @@ module.exports = function( options ) {
 
 
   function load_project( args, done ) {
-    done( null, {project:args.project} )
+    out = {}
+    // load via ensure_entity
+    out[options.name] = args[options.name]
+    done( null, out )
   }
 
 
   function start_project( args, done ) {
-    args.project.active = true
-    args.project.save$( function(err,project){
-      return done(err,{ok:!err,project:project})
+    args[options.name].active = true
+    args[options.name].save$( function(err,project){
+      var out = {ok:!err}
+      out[options.name] = project
+      return done(err,out)
     })
   }
 
 
 
   function stop_project( args, done ) {
-    args.project.active = false
-    args.project.save$( function(err,project){
-      return done(err,{ok:!err,project:project})
+    args[options.name].active = false
+    args[options.name].save$( function(err,project){
+      var out = {ok:!err}
+      out[options.name] = project
+      return done(err,out)
     })
   }
 
 
 
   function move_project( args, done ) {
-    args.project.account = args.account.id
-    args.project.save$( done )
+    args[options.name].account = args.account.id
+    args[options.name].save$( done )
   }
 
 
 
   function adduser( args, done ) {
     var user    = args.user
-    var project = args.project
+    var project = args[options.name]
 
-    additem( user,    project, 'projects' )
+    additem( user,    project, options.listname )
     additem( project, user,    'users' )
 
-    project.save$( function( err, project ){
+    project.save$( function( err, project ) {
       if( err ) return done(err);
 
       user.save$( done )
@@ -206,13 +218,15 @@ module.exports = function( options ) {
 
   function removeuser( args, done ) {
     var user    = args.user
-    var project = args.project
+    var project = args[options.name]
 
-    user.projects = user.projects || []
-    user.projects = _.reject(user.projects,function(prjid){return prjid==project.id})
+    user[options.name] = user.projects || []
+    user[options.name] = 
+      _.reject(user[options.listname],function(prjid){return prjid==project.id})
 
     project.users = project.users || []
-    project.users = _.reject(project.users,function(usrid){return usrid==user.id})
+    project.users = 
+      _.reject(project.users,function(usrid){return usrid==user.id})
 
     project.save$( function( err, project ){
       if( err ) return done(err);
@@ -223,14 +237,13 @@ module.exports = function( options ) {
 
 
 
-  function user_projects( args, done ) {
-
-    var projectent = this.make$('sys/project')
+  function for_user( args, done ) {
+    var projectent = this.make$( project_entname )
 
     var user = args.user
 
     // specifically assigned to projects
-    var list = args.user.projects ? _.clone(args.user.projects) : []
+    var list = args.user[options.listname] ? _.clone(args.user[options.listname]) : []
 
     // all projects in account, if project has no specific users
     async.mapLimit(user.accounts||[],options.loadlimit,function(accid,cb){
@@ -260,11 +273,11 @@ module.exports = function( options ) {
       if( err ) return done(err);
 
       list = _.uniq(list)
-      loadall( 'projects', projectent, list, function(err,out){
+      loadall( options.listname, projectent, list, function(err,out){
         if( err) return done(err);
 
         if( void 0 != args.kind ) {
-          out.projects = _.filter(out.projects,function(proj){
+          out[options.listname] = _.filter(out[options.listname],function(proj){
             return args.kind == proj.kind
           })
         }
@@ -276,17 +289,21 @@ module.exports = function( options ) {
 
 
 
-  function project_users( args, done ) {
-    var project = args.project
+  function list_users( args, done ) {
+    var project = args[options.name]
 
     // specifically assigned to project
     var list = project.users ? _.clone(project.users) : []
+
+    var accountent = this.make$( account_entname )
 
     accountent.load$( project.account, function( err, account ) {
       if( err ) return err;
 
       list = list.concat( account.users || [] )
       list = _.uniq(list)
+
+      var userent = this.make$( user_entname )
 
       loadall( 'users', userent, list, done )
     })
@@ -319,11 +336,14 @@ module.exports = function( options ) {
     prefix:options.prefix,
     pin:{role:plugin,cmd:'*'},
     map:{
-      'user_projects': { GET:buildcontext },
+      'for_user': { GET:buildcontext },
       'load':  { GET:buildcontext, alias:'load/:project' },
       'save':  { POST:buildcontext },
       'start': { POST:buildcontext },
-      'stop':  { POST:buildcontext }
+      'stop':  { POST:buildcontext },
+
+      // legacy
+      'user_projects': { GET:buildcontext },
     }
   }})
 
@@ -331,6 +351,7 @@ module.exports = function( options ) {
 
 
   seneca.add({init:plugin}, function( args, done ){
+    var projectent = this.make$( project_entname )
     seneca.act('role:util, cmd:define_sys_entity', {list:[projectent.canon$()]})
     done()
   })
