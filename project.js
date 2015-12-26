@@ -57,16 +57,20 @@ module.exports = function project( options ) {
   seneca.add({role:plugin,cmd:'user_projects'}, for_user)
 
 
+
+
   // FIX: deprecated, use a wrap instead
+  var entmap = {
+    account: seneca.make( account_entname ),
+    user: seneca.make( user_entname ),
+  }
+  entmap[options.name] = seneca.make( project_entname ),
+  
   seneca.act({
     role:'util',
     cmd:'ensure_entity',
     pin:{role:plugin,cmd:'*'},
-    entmap:{
-      account: seneca.make( account_entname ),
-      project: seneca.make( project_entname ),
-      user: seneca.make( user_entname ),
-    }
+    entmap:entmap
   })
 
 
@@ -164,7 +168,7 @@ module.exports = function project( options ) {
 
 
   function load_project( args, done ) {
-    out = {}
+    var out = {}
     // load via ensure_entity
     out[options.name] = args[options.name]
     done( null, out )
@@ -220,7 +224,7 @@ module.exports = function project( options ) {
     var user    = args.user
     var project = args[options.name]
 
-    user[options.name] = user.projects || []
+    user[options.name] = user[options.listname] || []
     user[options.name] = 
       _.reject(user[options.listname],function(prjid){return prjid==project.id})
 
@@ -337,7 +341,7 @@ module.exports = function project( options ) {
     pin:{role:plugin,cmd:'*'},
     map:{
       'for_user': { GET:buildcontext },
-      'load':  { GET:buildcontext, alias:'load/:project' },
+      'load':  { GET:buildcontext, alias:'load/:'+options.name },
       'save':  { POST:buildcontext },
       'start': { POST:buildcontext },
       'stop':  { POST:buildcontext },
