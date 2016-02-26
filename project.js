@@ -57,15 +57,15 @@ module.exports = function project( options ) {
     account: seneca.make( account_entname ),
     user: seneca.make( user_entname ),
   }
-  entmap[options.name] = seneca.make( project_entname ),
+  entmap[options.name] = seneca.make( project_entname )
 
-    function additem( ent, refent, name ) {
-      if( ent && refent && name ) {
-        ent[name] = ent[name] || []
-        ent[name].push( refent.id )
-        ent[name] = _.uniq( ent[name] )
-      }
+  function additem( ent, refent, name ) {
+    if( ent && refent && name ) {
+      ent[name] = ent[name] || []
+      ent[name].push( refent.id )
+      ent[name] = _.uniq( ent[name] )
     }
+  }
 
   function loadall( name, ent, list, done ) {
     async.mapLimit(list||[],options.loadlimit,function(id,cb){
