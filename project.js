@@ -1,7 +1,6 @@
 /* Copyright (c) 2013-2015 Richard Rodger and other contributors, MIT License */
 "use strict";
 
-
 var _     = require('lodash')
 var async = require('async')
 
@@ -28,19 +27,16 @@ module.exports = function project( options ) {
   var account_entname = 'sys/account'
   var user_entname    = 'sys/user'
 
-
   seneca.depends(plugin,['user','account'])
 
   if( options.web ) {
     seneca.depends(plugin,['auth'])
   }
 
-
   var projnid
   if( options.idgen.short ) {
     projnid = nid({length:options.idgen.length})
   }
-
 
   seneca.add({role:plugin,cmd:'save'},       save_project)
   seneca.add({role:plugin,cmd:'start'},      start_project)
@@ -56,9 +52,6 @@ module.exports = function project( options ) {
   seneca.add({role:plugin,cmd:'project_users'}, list_users)
   seneca.add({role:plugin,cmd:'user_projects'}, for_user)
 
-
-
-
   // FIX: deprecated, use a wrap instead
   var entmap = {
     account: seneca.make( account_entname ),
@@ -66,15 +59,6 @@ module.exports = function project( options ) {
   }
   entmap[options.name] = seneca.make( project_entname ),
   
-  seneca.act({
-    role:'util',
-    cmd:'ensure_entity',
-    pin:{role:plugin,cmd:'*'},
-    entmap:entmap
-  })
-
-
-
   function additem( ent, refent, name ) {
     if( ent && refent && name ) {
       ent[name] = ent[name] || []
@@ -82,8 +66,6 @@ module.exports = function project( options ) {
       ent[name] = _.uniq( ent[name] )
     }
   }
-
-
 
   function loadall( name, ent, list, done ) {
     async.mapLimit(list||[],options.loadlimit,function(id,cb){
@@ -99,22 +81,22 @@ module.exports = function project( options ) {
     })
   }
 
-
-
   function save_project( args, done ) {
     var projectent = this.make$( project_entname )
 
     var isnew = false
 
+    var projectData = args.data
+
     if( args.id ) {
-      projectent.load$(args.id, function( err, project ){
+      projectent.load$(projectData.id, function( err, project ){
         if( err ) return done( err );
         return update_project( project )
       })
     }
     else {
       isnew = true
-      var newproj = projectent.make$({id$:args.id$})
+      var newproj = projectent.make$({id$:projectData.id$})
 
 
       if( projnid ) return genid();
@@ -139,12 +121,12 @@ module.exports = function project( options ) {
         { kind:'primary' },
 
         // caller specified values, overrides defaults
-        args,
+        projectData,
 
         // controlled values, can't be overridden
         {
-          active: void 0 == args.active ? true : !!args.active,
-          account:args.account.id,
+          active: void 0 == projectData.active ? true : !!projectData.active,
+          account:projectData.account.id,
         },
 
         // invalid properties, will be deleted
@@ -153,9 +135,9 @@ module.exports = function project( options ) {
       project.data$(fields)
 
       project.save$( function( err, project ) {
-        additem( args.account, project, options.listname)
+        additem( projectData.account, project, options.listname)
 
-        args.account.save$( function( err, account ) {
+        projectData.account.save$( function( err, account ) {
           if( err ) return done( err );
 
           var out = {account:account,new:isnew}
@@ -166,14 +148,12 @@ module.exports = function project( options ) {
     }
   }
 
-
   function load_project( args, done ) {
     var out = {}
     // load via ensure_entity
     out[options.name] = args[options.name]
     done( null, out )
   }
-
 
   function start_project( args, done ) {
     args[options.name].active = true
@@ -184,8 +164,6 @@ module.exports = function project( options ) {
     })
   }
 
-
-
   function stop_project( args, done ) {
     args[options.name].active = false
     args[options.name].save$( function(err,project){
@@ -195,14 +173,10 @@ module.exports = function project( options ) {
     })
   }
 
-
-
   function move_project( args, done ) {
     args[options.name].account = args.account.id
     args[options.name].save$( done )
   }
-
-
 
   function adduser( args, done ) {
     var user    = args.user
@@ -217,8 +191,6 @@ module.exports = function project( options ) {
       user.save$( done )
     })
   }
-
-
 
   function removeuser( args, done ) {
     var user    = args.user
@@ -238,8 +210,6 @@ module.exports = function project( options ) {
       user.save$( done )
     })
   }
-
-
 
   function for_user( args, done ) {
     var projectent = this.make$( project_entname )
@@ -291,8 +261,6 @@ module.exports = function project( options ) {
     })
   }
 
-
-
   function list_users( args, done ) {
     var project = args[options.name]
 
@@ -313,8 +281,6 @@ module.exports = function project( options ) {
     })
   }
 
-
-
   function buildcontext( req, res, args, act, respond ) {
     var user = req.seneca && req.seneca.user
 
@@ -333,33 +299,43 @@ module.exports = function project( options ) {
     act(args,respond)
   }
 
+  function init( args, done ){
+    async.series
+    (
+      function(cb){
+        var projectent = this.make$( project_entname )
+        seneca.act('role:util, cmd:define_sys_entity', {list:[projectent.canon$()]}, cb)
+      },
+      function(cb){
+        seneca.act({
+          role:'util',
+          cmd:'ensure_entity',
+          pin:{role:plugin,cmd:'*'},
+          entmap:entmap
+        }, cb)
+      },
+      function(cb){
+        // web interface
+        seneca.act_if(options.web, {role:'web', use:{
+          prefix:options.prefix,
+          pin:{role:plugin,cmd:'*'},
+          map:{
+            'for_user': { GET:buildcontext },
+            'load':  { GET:buildcontext, alias:'load/:'+options.name },
+            'save':  { POST:buildcontext, data: true },
+            'start': { POST:buildcontext },
+            'stop':  { POST:buildcontext },
 
+            // legacy
+            'user_projects': { GET:buildcontext },
+          }
+        }}, cb)
+      },
+      done
+    )
+  }
 
-  // web interface
-  seneca.act_if(options.web, {role:'web', use:{
-    prefix:options.prefix,
-    pin:{role:plugin,cmd:'*'},
-    map:{
-      'for_user': { GET:buildcontext },
-      'load':  { GET:buildcontext, alias:'load/:'+options.name },
-      'save':  { POST:buildcontext },
-      'start': { POST:buildcontext },
-      'stop':  { POST:buildcontext },
-
-      // legacy
-      'user_projects': { GET:buildcontext },
-    }
-  }})
-
-
-
-
-  seneca.add({init:plugin}, function( args, done ){
-    var projectent = this.make$( project_entname )
-    seneca.act('role:util, cmd:define_sys_entity', {list:[projectent.canon$()]})
-    done()
-  })
-
+  seneca.add({init:plugin}, init)
 
   return {
     name: plugin
