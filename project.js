@@ -58,14 +58,14 @@ module.exports = function project( options ) {
     user: seneca.make( user_entname ),
   }
   entmap[options.name] = seneca.make( project_entname ),
-  
-  function additem( ent, refent, name ) {
-    if( ent && refent && name ) {
-      ent[name] = ent[name] || []
-      ent[name].push( refent.id )
-      ent[name] = _.uniq( ent[name] )
+
+    function additem( ent, refent, name ) {
+      if( ent && refent && name ) {
+        ent[name] = ent[name] || []
+        ent[name].push( refent.id )
+        ent[name] = _.uniq( ent[name] )
+      }
     }
-  }
 
   function loadall( name, ent, list, done ) {
     async.mapLimit(list||[],options.loadlimit,function(id,cb){
@@ -87,8 +87,9 @@ module.exports = function project( options ) {
     var isnew = false
 
     var projectData = args.data
+    var accountData = args.account
 
-    if( args.id ) {
+    if( projectData.id ) {
       projectent.load$(projectData.id, function( err, project ){
         if( err ) return done( err );
         return update_project( project )
@@ -126,7 +127,7 @@ module.exports = function project( options ) {
         // controlled values, can't be overridden
         {
           active: void 0 == projectData.active ? true : !!projectData.active,
-          account:projectData.account.id,
+          account:accountData.id,
         },
 
         // invalid properties, will be deleted
@@ -135,9 +136,9 @@ module.exports = function project( options ) {
       project.data$(fields)
 
       project.save$( function( err, project ) {
-        additem( projectData.account, project, options.listname)
+        additem( accountData, project, options.listname)
 
-        projectData.account.save$( function( err, account ) {
+        accountData.save$( function( err, account ) {
           if( err ) return done( err );
 
           var out = {account:account,new:isnew}
@@ -197,11 +198,11 @@ module.exports = function project( options ) {
     var project = args[options.name]
 
     user[options.name] = user[options.listname] || []
-    user[options.name] = 
+    user[options.name] =
       _.reject(user[options.listname],function(prjid){return prjid==project.id})
 
     project.users = project.users || []
-    project.users = 
+    project.users =
       _.reject(project.users,function(usrid){return usrid==user.id})
 
     project.save$( function( err, project ){
@@ -301,36 +302,36 @@ module.exports = function project( options ) {
 
   function init( args, done ){
     async.series
-    (
-      function(cb){
-        var projectent = this.make$( project_entname )
-        seneca.act('role:util, cmd:define_sys_entity', {list:[projectent.canon$()]}, cb)
-      },
-      function(cb){
-        seneca.act({
-          role:'util',
-          cmd:'ensure_entity',
-          pin:{role:plugin,cmd:'*'},
-          entmap:entmap
-        }, cb)
-      },
-      function(cb){
-        // web interface
-        seneca.act_if(options.web, {role:'web', use:{
-          prefix:options.prefix,
-          pin:{role:plugin,cmd:'*'},
-          map:{
-            'for_user': { GET:buildcontext },
-            'load':  { GET:buildcontext, alias:'load/:'+options.name },
-            'save':  { POST:buildcontext, data: true },
-            'start': { POST:buildcontext },
-            'stop':  { POST:buildcontext },
+    ([
+        function(cb){
+          var projectent = seneca.make$( project_entname )
+          seneca.act('role:util, cmd:define_sys_entity', {list:[projectent.canon$()]}, cb)
+        },
+        function(cb){
+          seneca.act({
+            role:'util',
+            cmd:'ensure_entity',
+            pin:{role:plugin,cmd:'*'},
+            entmap:entmap
+          }, cb)
+        },
+        function(cb){
+          // web interface
+          seneca.act_if(options.web, {role:'web', use:{
+            prefix:options.prefix,
+            pin:{role:plugin,cmd:'*'},
+            map:{
+              'for_user': { GET:buildcontext },
+              'load':  { GET:buildcontext, alias:'load/:'+options.name },
+              'save':  { POST:buildcontext, data: true },
+              'start': { POST:buildcontext },
+              'stop':  { POST:buildcontext },
 
-            // legacy
-            'user_projects': { GET:buildcontext },
-          }
-        }}, cb)
-      },
+              // legacy
+              'user_projects': { GET:buildcontext },
+            }
+          }}, cb)
+        }],
       done
     )
   }
