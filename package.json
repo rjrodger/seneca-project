@@ -1,6 +1,6 @@
 {
   "name": "seneca-project",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Seneca project business logic",
   "main": "project.js",
   "scripts": {
@@ -27,6 +27,7 @@
     "seneca": "*"
   },
   "devDependencies": {
+    "chai": "3.5.0",
     "lab": "4.0.0",
     "seneca": "plugin",
     "seneca-account": "*",
