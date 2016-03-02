@@ -72,8 +72,8 @@ suite('project', function () {
     si.act('role: account, cmd: add_user', { user:tmp.u1, account:tmp.a1 }, function( err, out ){
       assert.isNotNull(out.user)
       assert.isNotNull(out.account)
-      assert.ok(_.contains(out.user.accounts,out.account.id))
-      assert.ok(_.contains(out.account.users,out.user.id))
+      assert.ok(_.indexOf(out.user.accounts,out.account.id) != -1)
+      assert.ok(_.indexOf(out.account.users,out.user.id) != -1)
       tmp.u1 = out.user
       tmp.a1 = out.account
       done()
@@ -92,7 +92,7 @@ suite('project', function () {
       tmp.a1.load$(function(err, a1){
         assert.isNull(err)
         assert.isNotNull(a1)
-        assert.ok( _.contains(a1.projects,tmp.p1.id) )
+        assert.ok( _.indexOf(a1.projects,tmp.p1.id) != -1)
 
         done()
       })
@@ -145,7 +145,7 @@ suite('project', function () {
         assert.isNull(err)
         assert.isNotNull(a1)
         assert.isNotNull(a1.projects)
-        assert.ok( _.contains(a1.projects,tmp.p2.id) )
+        assert.ok( _.indexOf(a1.projects,tmp.p2.id) != -1 )
 
         done()
       })
