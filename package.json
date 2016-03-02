@@ -29,7 +29,7 @@
   "devDependencies": {
     "chai": "3.5.0",
     "gex": "0.2.2",
-    "lab": "4.0.0",
+    "lab": "6.0.0",
     "seneca": "plugin",
     "seneca-account": "*",
     "seneca-auth": "*",
