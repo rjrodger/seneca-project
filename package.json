@@ -18,8 +18,8 @@
   "author": "Richard Rodger (http://richardrodger.com)",
   "license": "MIT",
   "dependencies": {
-    "async": "~1.5.0",
-    "lodash": "~3.10.1",
+    "async": "~1.5.2",
+    "lodash": "4.6.x",
     "nid": "~0.3.2"
   },
   "peerDependencies": {
